@@ -23,21 +23,6 @@ export function registerDashboard(program: Command): void {
         process.exit(1);
       }
 
-      // Auto-increment port if configured port is already in use
-      if (!(await isPortAvailable(port))) {
-        const newPort = await findFreePort(port + 1);
-        if (newPort === null) {
-          console.error(
-            chalk.red(`No free port found in range ${port}–${port + MAX_PORT_SCAN - 1}.`),
-          );
-          process.exit(1);
-        }
-        console.log(
-          chalk.yellow(`⚠ Port ${port} in use, using port ${newPort} instead`),
-        );
-        port = newPort;
-      }
-
       const localWebDir = findWebDir();
 
       if (!existsSync(resolve(localWebDir, "package.json"))) {
@@ -50,7 +35,8 @@ export function registerDashboard(program: Command): void {
       }
 
       if (opts.rebuild) {
-        // Check if a dashboard is already running on this port.
+        // Check if a dashboard is already running on the *configured* port
+        // before auto-incrementing, so --rebuild can kill the old process.
         const runningPid = await findRunningDashboardPid(port);
         const runningWebDir = runningPid ? await findProcessWebDir(runningPid) : null;
         const targetWebDir = runningWebDir ?? localWebDir;
@@ -71,6 +57,21 @@ export function registerDashboard(program: Command): void {
 
         await cleanNextCache(targetWebDir);
         // Fall through to start the dashboard on this port.
+      }
+
+      // Auto-increment port if configured port is already in use
+      if (!(await isPortAvailable(port))) {
+        const newPort = await findFreePort(port + 1);
+        if (newPort === null) {
+          console.error(
+            chalk.red(`No free port found in range ${port + 1}–${port + MAX_PORT_SCAN}.`),
+          );
+          process.exit(1);
+        }
+        console.log(
+          chalk.yellow(`⚠ Port ${port} in use, using port ${newPort} instead`),
+        );
+        port = newPort;
       }
 
       const webDir = localWebDir;

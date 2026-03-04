@@ -263,7 +263,7 @@ async function runStartup(
       const newPort = await findFreePort(port + 1);
       if (newPort === null) {
         throw new Error(
-          `No free port found in range ${port}–${port + MAX_PORT_SCAN - 1}.`,
+          `No free port found in range ${port + 1}–${port + MAX_PORT_SCAN}.`,
         );
       }
       console.log(
