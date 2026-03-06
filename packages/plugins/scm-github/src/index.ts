@@ -495,8 +495,10 @@ function createGitHubSCM(): SCM {
               url: c.url,
             };
           });
-      } catch {
-        return [];
+      } catch (err) {
+        // Propagate so callers (maybeDispatchReviewBacklog) can distinguish
+        // "no comments" from "failed to check" and avoid clearing metadata.
+        throw new Error("Failed to fetch pending comments", { cause: err });
       }
     },
 
@@ -553,8 +555,8 @@ function createGitHubSCM(): SCM {
               url: c.html_url,
             };
           });
-      } catch {
-        return [];
+      } catch (err) {
+        throw new Error("Failed to fetch automated comments", { cause: err });
       }
     },
 

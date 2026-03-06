@@ -616,9 +616,9 @@ describe("scm-github plugin", () => {
       expect(comments[0].author).toBe("alice");
     });
 
-    it("returns empty on error", async () => {
+    it("throws on error so callers can distinguish failure from empty", async () => {
       mockGhError("API rate limit");
-      expect(await scm.getPendingComments(pr)).toEqual([]);
+      await expect(scm.getPendingComments(pr)).rejects.toThrow("Failed to fetch pending comments");
     });
 
     it("handles null path and line", async () => {
@@ -734,9 +734,11 @@ describe("scm-github plugin", () => {
       expect(comments).toEqual([]);
     });
 
-    it("returns empty on error", async () => {
+    it("throws on error so callers can distinguish failure from empty", async () => {
       mockGhError("network failure");
-      expect(await scm.getAutomatedComments(pr)).toEqual([]);
+      await expect(scm.getAutomatedComments(pr)).rejects.toThrow(
+        "Failed to fetch automated comments",
+      );
     });
 
     it("uses original_line as fallback", async () => {

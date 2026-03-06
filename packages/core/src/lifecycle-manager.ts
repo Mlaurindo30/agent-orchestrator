@@ -492,110 +492,121 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
       scm.getAutomatedComments(session.pr),
     ]);
 
+    // null means "failed to fetch" — preserve existing metadata.
+    // [] means "confirmed no comments" — safe to clear.
     const pendingComments =
       pendingResult.status === "fulfilled" && Array.isArray(pendingResult.value)
         ? pendingResult.value
-        : [];
+        : null;
     const automatedComments =
       automatedResult.status === "fulfilled" && Array.isArray(automatedResult.value)
         ? automatedResult.value
-        : [];
+        : null;
 
-    const pendingFingerprint = makeFingerprint(pendingComments.map((comment) => comment.id));
-    const lastPendingFingerprint = session.metadata["lastPendingReviewFingerprint"] ?? "";
-    const lastPendingDispatchHash = session.metadata["lastPendingReviewDispatchHash"] ?? "";
+    // --- Pending (human) review comments ---
+    // null = SCM fetch failed; skip processing to preserve existing metadata.
+    if (pendingComments !== null) {
+      const pendingFingerprint = makeFingerprint(pendingComments.map((comment) => comment.id));
+      const lastPendingFingerprint = session.metadata["lastPendingReviewFingerprint"] ?? "";
+      const lastPendingDispatchHash = session.metadata["lastPendingReviewDispatchHash"] ?? "";
 
-    if (
-      pendingFingerprint !== lastPendingFingerprint &&
-      transitionReaction?.key !== humanReactionKey
-    ) {
-      clearReactionTracker(session.id, humanReactionKey);
-    }
-    if (pendingFingerprint !== lastPendingFingerprint) {
-      updateSessionMetadata(session, {
-        lastPendingReviewFingerprint: pendingFingerprint,
-      });
-    }
-
-    if (!pendingFingerprint) {
-      clearReactionTracker(session.id, humanReactionKey);
-      updateSessionMetadata(session, {
-        lastPendingReviewFingerprint: "",
-        lastPendingReviewDispatchHash: "",
-        lastPendingReviewDispatchAt: "",
-      });
-    } else if (
-      transitionReaction?.key === humanReactionKey &&
-      transitionReaction.result?.success
-    ) {
-      if (lastPendingDispatchHash !== pendingFingerprint) {
+      if (
+        pendingFingerprint !== lastPendingFingerprint &&
+        transitionReaction?.key !== humanReactionKey
+      ) {
+        clearReactionTracker(session.id, humanReactionKey);
+      }
+      if (pendingFingerprint !== lastPendingFingerprint) {
         updateSessionMetadata(session, {
-          lastPendingReviewDispatchHash: pendingFingerprint,
-          lastPendingReviewDispatchAt: new Date().toISOString(),
+          lastPendingReviewFingerprint: pendingFingerprint,
         });
       }
-    } else if (
-      !(oldStatus !== newStatus && newStatus === "changes_requested") &&
-      pendingFingerprint !== lastPendingDispatchHash
-    ) {
-      const reactionConfig = getReactionConfigForSession(session, humanReactionKey);
-      if (
-        reactionConfig &&
-        reactionConfig.action &&
-        (reactionConfig.auto !== false || reactionConfig.action === "notify")
+
+      if (!pendingFingerprint) {
+        clearReactionTracker(session.id, humanReactionKey);
+        updateSessionMetadata(session, {
+          lastPendingReviewFingerprint: "",
+          lastPendingReviewDispatchHash: "",
+          lastPendingReviewDispatchAt: "",
+        });
+      } else if (
+        transitionReaction?.key === humanReactionKey &&
+        transitionReaction.result?.success
       ) {
-        const result = await executeReaction(
-          session.id,
-          session.projectId,
-          humanReactionKey,
-          reactionConfig,
-        );
-        if (result.success) {
+        if (lastPendingDispatchHash !== pendingFingerprint) {
           updateSessionMetadata(session, {
             lastPendingReviewDispatchHash: pendingFingerprint,
             lastPendingReviewDispatchAt: new Date().toISOString(),
           });
         }
+      } else if (
+        !(oldStatus !== newStatus && newStatus === "changes_requested") &&
+        pendingFingerprint !== lastPendingDispatchHash
+      ) {
+        const reactionConfig = getReactionConfigForSession(session, humanReactionKey);
+        if (
+          reactionConfig &&
+          reactionConfig.action &&
+          (reactionConfig.auto !== false || reactionConfig.action === "notify")
+        ) {
+          const result = await executeReaction(
+            session.id,
+            session.projectId,
+            humanReactionKey,
+            reactionConfig,
+          );
+          if (result.success) {
+            updateSessionMetadata(session, {
+              lastPendingReviewDispatchHash: pendingFingerprint,
+              lastPendingReviewDispatchAt: new Date().toISOString(),
+            });
+          }
+        }
       }
     }
 
-    const automatedFingerprint = makeFingerprint(automatedComments.map((comment) => comment.id));
-    const lastAutomatedFingerprint = session.metadata["lastAutomatedReviewFingerprint"] ?? "";
-    const lastAutomatedDispatchHash =
-      session.metadata["lastAutomatedReviewDispatchHash"] ?? "";
+    // --- Automated (bot) review comments ---
+    if (automatedComments !== null) {
+      const automatedFingerprint = makeFingerprint(
+        automatedComments.map((comment) => comment.id),
+      );
+      const lastAutomatedFingerprint = session.metadata["lastAutomatedReviewFingerprint"] ?? "";
+      const lastAutomatedDispatchHash =
+        session.metadata["lastAutomatedReviewDispatchHash"] ?? "";
 
-    if (automatedFingerprint !== lastAutomatedFingerprint) {
-      clearReactionTracker(session.id, automatedReactionKey);
-      updateSessionMetadata(session, {
-        lastAutomatedReviewFingerprint: automatedFingerprint,
-      });
-    }
+      if (automatedFingerprint !== lastAutomatedFingerprint) {
+        clearReactionTracker(session.id, automatedReactionKey);
+        updateSessionMetadata(session, {
+          lastAutomatedReviewFingerprint: automatedFingerprint,
+        });
+      }
 
-    if (!automatedFingerprint) {
-      clearReactionTracker(session.id, automatedReactionKey);
-      updateSessionMetadata(session, {
-        lastAutomatedReviewFingerprint: "",
-        lastAutomatedReviewDispatchHash: "",
-        lastAutomatedReviewDispatchAt: "",
-      });
-    } else if (automatedFingerprint !== lastAutomatedDispatchHash) {
-      const reactionConfig = getReactionConfigForSession(session, automatedReactionKey);
-      if (
-        reactionConfig &&
-        reactionConfig.action &&
-        (reactionConfig.auto !== false || reactionConfig.action === "notify")
-      ) {
-        const result = await executeReaction(
-          session.id,
-          session.projectId,
-          automatedReactionKey,
-          reactionConfig,
-        );
-        if (result.success) {
-          updateSessionMetadata(session, {
-            lastAutomatedReviewDispatchHash: automatedFingerprint,
-            lastAutomatedReviewDispatchAt: new Date().toISOString(),
-          });
+      if (!automatedFingerprint) {
+        clearReactionTracker(session.id, automatedReactionKey);
+        updateSessionMetadata(session, {
+          lastAutomatedReviewFingerprint: "",
+          lastAutomatedReviewDispatchHash: "",
+          lastAutomatedReviewDispatchAt: "",
+        });
+      } else if (automatedFingerprint !== lastAutomatedDispatchHash) {
+        const reactionConfig = getReactionConfigForSession(session, automatedReactionKey);
+        if (
+          reactionConfig &&
+          reactionConfig.action &&
+          (reactionConfig.auto !== false || reactionConfig.action === "notify")
+        ) {
+          const result = await executeReaction(
+            session.id,
+            session.projectId,
+            automatedReactionKey,
+            reactionConfig,
+          );
+          if (result.success) {
+            updateSessionMetadata(session, {
+              lastAutomatedReviewDispatchHash: automatedFingerprint,
+              lastAutomatedReviewDispatchAt: new Date().toISOString(),
+            });
+          }
         }
       }
     }
@@ -750,8 +761,8 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
           }
         }
       }
-    } catch {
-      // Poll cycle failed — will retry next interval
+    } catch (err) {
+      console.error("[ao lifecycle] Poll cycle failed:", err);
     } finally {
       polling = false;
     }
