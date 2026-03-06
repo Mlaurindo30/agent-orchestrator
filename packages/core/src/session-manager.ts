@@ -1168,7 +1168,6 @@ export function createSessionManager(deps: SessionManagerDeps): SessionManager {
       await sendWithConfirmation(prepared);
     } catch (err) {
       const shouldRetryWithRestore =
-        !(err instanceof Error && err.message.includes("could not be confirmed")) &&
         prepared.restoredAt === undefined &&
         !NON_RESTORABLE_STATUSES.has(prepared.status);
 

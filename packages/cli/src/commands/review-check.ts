@@ -7,6 +7,7 @@ import { getSessionManager } from "../lib/create-session-manager.js";
 
 interface ReviewInfo {
   sessionId: string;
+  projectId: string;
   prNumber: string;
   pendingComments: number;
   reviewDecision: string | null;
@@ -74,11 +75,6 @@ export function registerReviewCheck(program: Command): void {
         process.exit(1);
       }
 
-      // Source prompt from lifecycle reaction config so review-check and
-      // the lifecycle worker stay aligned.
-      const reviewFixPrompt =
-        config.reactions["changes-requested"]?.message ?? DEFAULT_REVIEW_FIX_PROMPT;
-
       const sm = await getSessionManager(config);
       const sessions = await sm.list(projectId);
 
@@ -100,6 +96,7 @@ export function registerReviewCheck(program: Command): void {
           if (pendingComments > 0 || reviewDecision === "CHANGES_REQUESTED") {
             results.push({
               sessionId: session.id,
+              projectId: session.projectId,
               prNumber: prNum,
               pendingComments,
               reviewDecision,
@@ -134,6 +131,13 @@ export function registerReviewCheck(program: Command): void {
 
         if (!opts.dryRun) {
           try {
+            // Resolve prompt per-session: project-level reaction overrides
+            // take precedence over global config, matching lifecycle worker behavior.
+            const projectReaction =
+              config.projects[result.projectId]?.reactions?.["changes-requested"];
+            const globalReaction = config.reactions["changes-requested"];
+            const reviewFixPrompt =
+              projectReaction?.message ?? globalReaction?.message ?? DEFAULT_REVIEW_FIX_PROMPT;
             await sm.send(result.sessionId, reviewFixPrompt);
             console.log(chalk.green(`    -> Fix prompt sent`));
           } catch (err) {
