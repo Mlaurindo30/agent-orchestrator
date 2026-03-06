@@ -917,6 +917,7 @@ export function createSessionManager(deps: SessionManagerDeps): SessionManager {
       writeFileSync(systemPromptFile, orchestratorConfig.systemPrompt, "utf-8");
     }
 
+    const existingOrchestratorMetadata = readMetadataRaw(sessionsDir, sessionId);
     const existingOrchestrator = await get(sessionId);
     if (existingOrchestrator?.runtimeHandle) {
       const existingAlive = await plugins.runtime
@@ -931,7 +932,7 @@ export function createSessionManager(deps: SessionManagerDeps): SessionManager {
       }
     }
 
-    if (!reserveSessionId(sessionsDir, sessionId)) {
+    if (!existingOrchestratorMetadata && !reserveSessionId(sessionsDir, sessionId)) {
       const raceSession = await get(sessionId);
       if (raceSession?.runtimeHandle) {
         const raceAlive = await plugins.runtime
