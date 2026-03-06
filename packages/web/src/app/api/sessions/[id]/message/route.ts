@@ -52,7 +52,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       console.error("Failed to send message:", errorMsg);
-      return NextResponse.json({ error: `Failed to send message: ${errorMsg}` }, { status: 500 });
+      const status = errorMsg.includes("not found") ? 404 : 500;
+      return NextResponse.json({ error: `Failed to send message: ${errorMsg}` }, { status });
     }
   } catch (error) {
     console.error("Failed to send message:", error);

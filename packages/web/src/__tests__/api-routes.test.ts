@@ -160,6 +160,7 @@ vi.mock("@/lib/services", () => ({
 import { GET as sessionsGET } from "@/app/api/sessions/route";
 import { POST as spawnPOST } from "@/app/api/spawn/route";
 import { POST as sendPOST } from "@/app/api/sessions/[id]/send/route";
+import { POST as messagePOST } from "@/app/api/sessions/[id]/message/route";
 import { POST as killPOST } from "@/app/api/sessions/[id]/kill/route";
 import { POST as restorePOST } from "@/app/api/sessions/[id]/restore/route";
 import { POST as remapPOST } from "@/app/api/sessions/[id]/remap/route";
@@ -331,6 +332,23 @@ describe("API Routes", () => {
       expect(res.status).toBe(400);
       const data = await res.json();
       expect(data.error).toMatch(/empty/);
+    });
+  });
+
+  describe("POST /api/sessions/:id/message", () => {
+    it("returns 404 for unknown session", async () => {
+      (mockSessionManager.send as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error("Session nonexistent not found"),
+      );
+
+      const req = makeRequest("/api/sessions/nonexistent/message", {
+        method: "POST",
+        body: JSON.stringify({ message: "hello" }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const res = await messagePOST(req, { params: Promise.resolve({ id: "nonexistent" }) });
+      expect(res.status).toBe(404);
     });
   });
 
