@@ -282,7 +282,7 @@ describe("getLaunchCommand", () => {
     const cmd = agent.getLaunchCommand(
       makeLaunchConfig({
         sessionId: "my-orchestrator",
-        permissions: "skip",
+        permissions: "permissionless",
         systemPromptFile: "/tmp/orchestrator.md",
       }),
     );

@@ -21,6 +21,7 @@ import {
   isRestorable,
   NON_RESTORABLE_STATUSES,
   SessionNotRestorableError,
+  SessionNotFoundError,
   WorkspaceMissingError,
   type OpenCodeSessionManager,
   type Session,
@@ -1122,16 +1123,15 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
 
   async function list(projectId?: string): Promise<Session[]> {
     const allSessions = listAllSessions(projectId);
-    const results: Session[] = [];
     let openCodeSessionListPromise: Promise<OpenCodeSessionListEntry[]> | undefined;
 
-    for (const { sessionName, projectId: sessionProjectId } of allSessions) {
+    const tasks = allSessions.map(async ({ sessionName, projectId: sessionProjectId }) => {
       const project = config.projects[sessionProjectId];
-      if (!project) continue;
+      if (!project) return null;
 
       const sessionsDir = getProjectSessionsDir(project);
       const raw = readMetadataRaw(sessionsDir, sessionName);
-      if (!raw) continue;
+      if (!raw) return null;
 
       let createdAt: Date | undefined;
       let modifiedAt: Date | undefined;
@@ -1174,10 +1174,11 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
         }
       }
 
-      results.push(session);
-    }
+      return session;
+    });
 
-    return results;
+    const resolved = await Promise.all(tasks);
+    return resolved.filter((session): session is Session => session !== null);
   }
 
   async function get(sessionId: SessionId): Promise<Session | null> {
@@ -1239,7 +1240,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
     }
 
     if (!raw || !sessionsDir) {
-      throw new Error(`Session ${sessionId} not found`);
+      throw new SessionNotFoundError(sessionId);
     }
 
     const cleanupAgent = raw["agent"] ?? project?.agent ?? config.defaults.agent;
@@ -1469,7 +1470,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
   async function send(sessionId: SessionId, message: string): Promise<void> {
     const located = findSessionRecord(sessionId);
     if (!located) {
-      throw new Error(`Session ${sessionId} not found`);
+      throw new SessionNotFoundError(sessionId);
     }
 
     const { raw, sessionsDir, project } = located;
@@ -1567,7 +1568,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
     const prepareSession = async (forceRestore = false): Promise<Session> => {
       const current = await get(sessionId);
       if (!current) {
-        throw new Error(`Session ${sessionId} not found`);
+        throw new SessionNotFoundError(sessionId);
       }
 
       const handle =
@@ -1676,7 +1677,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
     if (!reference) throw new Error("PR reference is required");
 
     const located = findSessionRecord(sessionId);
-    if (!located) throw new Error(`Session ${sessionId} not found`);
+    if (!located) throw new SessionNotFoundError(sessionId);
 
     const { raw, sessionsDir, project, projectId } = located;
     if (raw["role"] === "orchestrator") {
@@ -1788,7 +1789,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
     }
 
     if (!raw || !sessionsDir || !project) {
-      throw new Error(`Session ${sessionId} not found`);
+      throw new SessionNotFoundError(sessionId);
     }
 
     const selectedAgent = raw["agent"] ?? project.agent ?? config.defaults.agent;
@@ -1849,7 +1850,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
     }
 
     if (!raw || !sessionsDir || !project || !projectId) {
-      throw new Error(`Session ${sessionId} not found`);
+      throw new SessionNotFoundError(sessionId);
     }
 
     const selectedAgent = raw["agent"] ?? project.agent ?? config.defaults.agent;

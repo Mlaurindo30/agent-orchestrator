@@ -273,7 +273,7 @@ describe("getLaunchCommand (integration)", () => {
     const cmd = agent.getLaunchCommand({
       ...baseConfig,
       sessionId: "test-orchestrator",
-      permissions: "skip",
+      permissions: "permissionless",
       systemPromptFile: "/tmp/orchestrator-prompt.md",
     });
     expect(cmd).toContain(
