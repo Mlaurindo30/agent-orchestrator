@@ -347,7 +347,7 @@ async function runStartup(
       }
       reused =
         orchestratorSessionStrategy === "reuse" &&
-        session.metadata["orchestratorSessionReused"] === "true";
+        session.metadata?.["orchestratorSessionReused"] === "true";
       spinner.succeed(reused ? "Orchestrator session reused" : "Orchestrator session created");
     } catch (err) {
       spinner.fail("Orchestrator setup failed");

@@ -620,7 +620,14 @@ describe("start command — browser open waits for port", () => {
 });
 
 describe("start command — orchestrator session strategy display", () => {
-  it("shows reused messaging when strategy is reuse and runtime handle matches", async () => {
+  function getLoggedOutput(): string {
+    return vi
+      .mocked(console.log)
+      .mock.calls.map((c) => c.join(" "))
+      .join("\n");
+  }
+
+  it("shows reused messaging when strategy is reuse and metadata marks the session reused", async () => {
     mockConfigRef.current = makeConfig({
       "my-app": makeProject({ orchestratorSessionStrategy: "reuse" }),
     });
@@ -637,16 +644,14 @@ describe("start command — orchestrator session strategy display", () => {
 
     await program.parseAsync(["node", "test", "start", "--no-dashboard"]);
 
-    const output = vi
-      .mocked(console.log)
-      .mock.calls.map((c) => c.join(" "))
-      .join("\n");
+    const output = getLoggedOutput();
     expect(output).toContain("reused existing session (app-orchestrator)");
+    expect(output).not.toContain("tmux attach -t tmux-session-1");
   });
 
-  it("does not show reused messaging for delete-new alias", async () => {
+  it("falls back to attach messaging when strategy is reuse but metadata is missing", async () => {
     mockConfigRef.current = makeConfig({
-      "my-app": makeProject({ orchestratorSessionStrategy: "delete-new" }),
+      "my-app": makeProject({ orchestratorSessionStrategy: "reuse" }),
     });
 
     mockSessionManager.get.mockResolvedValue({
@@ -660,13 +665,35 @@ describe("start command — orchestrator session strategy display", () => {
 
     await program.parseAsync(["node", "test", "start", "--no-dashboard"]);
 
-    const output = vi
-      .mocked(console.log)
-      .mock.calls.map((c) => c.join(" "))
-      .join("\n");
+    const output = getLoggedOutput();
     expect(output).toContain("tmux attach -t tmux-session-1");
     expect(output).not.toContain("reused existing session");
   });
+
+  it.each(["delete", "ignore", "delete-new", "ignore-new", "kill-previous"] as const)(
+    "uses attach messaging when strategy is %s",
+    async (orchestratorSessionStrategy) => {
+      mockConfigRef.current = makeConfig({
+        "my-app": makeProject({ orchestratorSessionStrategy }),
+      });
+
+      mockSessionManager.get.mockResolvedValue({
+        id: "app-orchestrator",
+        runtimeHandle: { id: "tmux-session-1" },
+      });
+      mockSessionManager.spawnOrchestrator.mockResolvedValue({
+        id: "app-orchestrator",
+        runtimeHandle: { id: "tmux-session-1" },
+        metadata: { orchestratorSessionReused: "true" },
+      });
+
+      await program.parseAsync(["node", "test", "start", "--no-dashboard"]);
+
+      const output = getLoggedOutput();
+      expect(output).toContain("tmux attach -t tmux-session-1");
+      expect(output).not.toContain("reused existing session");
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
