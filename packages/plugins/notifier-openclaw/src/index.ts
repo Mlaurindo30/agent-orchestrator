@@ -35,6 +35,7 @@ async function postWithRetry(
   headers: Record<string, string>,
   retries: number,
   retryDelayMs: number,
+  context: { sessionId: string },
 ): Promise<void> {
   let lastError: Error | undefined;
 
@@ -54,9 +55,21 @@ async function postWithRetry(
       if (!isRetryableStatus(response.status)) {
         throw lastError;
       }
+
+      if (attempt < retries) {
+        console.warn(
+          `[notifier-openclaw] Retry ${attempt + 1}/${retries} for session=${context.sessionId} after HTTP ${response.status}`,
+        );
+      }
     } catch (err) {
       if (err === lastError) throw err;
       lastError = err instanceof Error ? err : new Error(String(err));
+
+      if (attempt < retries) {
+        console.warn(
+          `[notifier-openclaw] Retry ${attempt + 1}/${retries} for session=${context.sessionId} after network error: ${lastError.message}`,
+        );
+      }
     }
 
     if (attempt < retries) {
@@ -130,7 +143,9 @@ export function create(config?: Record<string, unknown>): Notifier {
     };
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
-    await postWithRetry(url, payload, headers, retries, retryDelayMs);
+    const sessionId = payload.sessionKey?.slice(sessionKeyPrefix.length) ?? "default";
+
+    await postWithRetry(url, payload, headers, retries, retryDelayMs, { sessionId });
   }
 
   return {

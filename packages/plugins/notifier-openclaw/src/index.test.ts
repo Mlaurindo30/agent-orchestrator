@@ -140,6 +140,7 @@ describe("notifier-openclaw", () => {
 
   it("retries on 5xx response", async () => {
     vi.useFakeTimers();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({ ok: false, status: 503, text: () => Promise.resolve("down") })
@@ -156,6 +157,9 @@ describe("notifier-openclaw", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     await promise;
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Retry 1/1 for session=ao-5 after HTTP 503"),
+    );
   });
 
   it("does not retry on 4xx response", async () => {

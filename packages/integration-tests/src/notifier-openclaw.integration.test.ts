@@ -53,18 +53,45 @@ describe("notifier-openclaw integration", () => {
     expect(body.message).toContain("CI failed 5 times");
   });
 
-  it("notifyWithActions appends available action labels", async () => {
+  it("notifyWithActions formats escalation header/context and appends action labels", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchMock);
 
     const actions: NotifyAction[] = [{ label: "retry" }, { label: "kill" }];
 
     const notifier = openClawPlugin.create({ token: "tok" });
-    await notifier.notifyWithActions!(makeEvent({ sessionId: "ao-5" }), actions);
+    await notifier.notifyWithActions!(
+      makeEvent({
+        priority: "action",
+        type: "ci.failing",
+        sessionId: "ao-5",
+        message: "CI check failed on app-1",
+        data: { checkName: "lint" },
+      }),
+      actions,
+    );
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.sessionKey).toBe("hook:ao:ao-5");
+    expect(body.message).toContain("[AO ACTION] ao-5 ci.failing");
+    expect(body.message).toContain('Context: {"checkName":"lint"}');
     expect(body.message).toContain("Actions available: retry, kill");
+  });
+
+  it("uses explicit deliver=true in hooks payload", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const notifier = openClawPlugin.create({
+      token: "tok",
+      deliver: true,
+      wakeMode: "now",
+    });
+    await notifier.notify(makeEvent({ sessionId: "ao-21" }));
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.deliver).toBe(true);
+    expect(body.wakeMode).toBe("now");
   });
 
   it("retries 503 then succeeds", async () => {
