@@ -119,6 +119,13 @@ export async function cleanupSession(
     }
 
     const sessionsDir = getSessionsDir(config.configPath, project.path);
+
+    updateMetadata(sessionsDir, sessionId, {
+      status: "terminated",
+      terminatedAt: new Date().toISOString(),
+      terminationReason: "cleanup",
+    });
+
     deleteMetadata(sessionsDir, sessionId, true);
 
     return {

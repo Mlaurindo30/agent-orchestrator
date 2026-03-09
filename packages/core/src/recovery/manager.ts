@@ -2,12 +2,7 @@ import type { OrchestratorConfig, PluginRegistry, Session } from "../types.js";
 import { scanAllSessions, getRecoveryLogPath } from "./scanner.js";
 import { validateSession } from "./validator.js";
 import { executeAction } from "./actions.js";
-import {
-  writeRecoveryLog,
-  createLogEntry,
-  createEmptyReport,
-  formatRecoveryReport,
-} from "./logger.js";
+import { writeRecoveryLog, createLogEntry, createEmptyReport } from "./logger.js";
 import {
   DEFAULT_RECOVERY_CONFIG,
   type RecoveryContext,
@@ -106,10 +101,6 @@ export async function runRecovery(options: RecoveryManagerOptions): Promise<Reco
 
   report.durationMs = Date.now() - startTime;
 
-  if (!dryRun) {
-    console.log(formatRecoveryReport(report));
-  }
-
   return {
     report,
     assessments,
@@ -161,5 +152,26 @@ export async function recoverSessionById(
   }
 
   const assessment = await validateSession(scanned, config, registry);
-  return executeAction(assessment, config, registry, context);
+
+  if (dryRun) {
+    return {
+      success: true,
+      sessionId,
+      action: assessment.action,
+    };
+  }
+
+  const result = await executeAction(assessment, config, registry, context);
+
+  const logAction = mapActionToLogAction(result.action, result.success);
+  writeRecoveryLog(
+    recoveryConfig.logPath,
+    createLogEntry(sessionId, logAction, {
+      previousStatus: assessment.metadataStatus,
+      reason: assessment.reason,
+      error: result.error,
+    }),
+  );
+
+  return result;
 }
