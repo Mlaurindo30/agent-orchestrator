@@ -1717,11 +1717,6 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
     }
 
     const takenOverFrom = [...conflictingSessions];
-    if (takenOverFrom.length > 0 && !options?.takeover) {
-      throw new Error(
-        `PR #${pr.number} is already tracked by ${takenOverFrom.join(", ")}. Re-run with takeover enabled to transfer ownership.`,
-      );
-    }
 
     const workspacePath = raw["worktree"];
     if (!workspacePath) {

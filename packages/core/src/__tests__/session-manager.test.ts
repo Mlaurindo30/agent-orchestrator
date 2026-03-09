@@ -3628,7 +3628,7 @@ describe("claimPR", () => {
     expect(previous!["status"]).toBe("working");
   });
 
-  it("rejects takeover when another session already tracks the PR", async () => {
+  it("automatically consolidates ownership when another session tracks the PR", async () => {
     const mockSCM = makeSCM();
 
     writeMetadata(sessionsDir, "app-1", {
@@ -3649,8 +3649,18 @@ describe("claimPR", () => {
     });
 
     const sm = createSessionManager({ config, registry: registryWithSCM(mockSCM) });
+    const result = await sm.claimPR("app-2", "42");
 
-    await expect(sm.claimPR("app-2", "42")).rejects.toThrow("already tracked by app-1");
+    expect(result.takenOverFrom).toContain("app-1");
+    expect(result.pr.number).toBe(42);
+
+    const app2 = readMetadataRaw(sessionsDir, "app-2");
+    expect(app2!["pr"]).toBe("https://github.com/org/my-app/pull/42");
+    expect(app2!["status"]).toBe("pr_open");
+
+    const app1 = readMetadataRaw(sessionsDir, "app-1");
+    expect(app1!["pr"] ?? "").toBe("");
+    expect(app1!["status"]).toBe("working");
   });
 
   it("keeps AO metadata updated even if GitHub assignment fails", async () => {
