@@ -1,5 +1,5 @@
 import type { OrchestratorConfig, PluginRegistry, Session } from "../types.js";
-import { getRecoveryLogPath } from "./scanner.js";
+import { scanAllSessions, getRecoveryLogPath } from "./scanner.js";
 import { validateSession } from "./validator.js";
 import { executeAction } from "./actions.js";
 import {
@@ -8,15 +8,14 @@ import {
   createEmptyReport,
   formatRecoveryReport,
 } from "./logger.js";
-import type {
-  RecoveryContext,
-  RecoveryReport,
-  RecoveryResult,
-  RecoveryAssessment,
-  RecoveryConfig,
+import {
+  DEFAULT_RECOVERY_CONFIG,
+  type RecoveryContext,
+  type RecoveryReport,
+  type RecoveryResult,
+  type RecoveryAssessment,
+  type RecoveryConfig,
 } from "./types.js";
-import { DEFAULT_RECOVERY_CONFIG } from "./types.js";
-import { scanAllSessions, type ScannedSession } from "./scanner.js";
 
 export interface RecoveryManagerOptions {
   config: OrchestratorConfig;

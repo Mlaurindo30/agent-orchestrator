@@ -1,15 +1,15 @@
 import { existsSync } from "node:fs";
-import type {
-  OrchestratorConfig,
-  PluginRegistry,
-  Runtime,
-  Agent,
-  Workspace,
-  RuntimeHandle,
-  SessionStatus,
-  ActivityState,
+import {
+  TERMINAL_STATUSES as TERMINAL_STATUSES_SET,
+  type OrchestratorConfig,
+  type PluginRegistry,
+  type Runtime,
+  type Agent,
+  type Workspace,
+  type RuntimeHandle,
+  type SessionStatus,
+  type ActivityState,
 } from "../types.js";
-import { TERMINAL_STATUSES as TERMINAL_STATUSES_SET } from "../types.js";
 import type { ScannedSession } from "./scanner.js";
 import type { RecoveryAssessment, RecoveryClassification, RecoveryAction } from "./types.js";
 
@@ -91,7 +91,7 @@ export async function validateSession(
   }
 
   let agentProcessRunning = false;
-  let agentActivity: ActivityState | null = null;
+  const agentActivity: ActivityState | null = null;
   if (agent && runtimeHandle) {
     try {
       agentProcessRunning = await agent.isProcessRunning(runtimeHandle);
@@ -162,7 +162,7 @@ function classifySession(
 
 function determineAction(
   classification: RecoveryClassification,
-  metadataStatus: SessionStatus,
+  _metadataStatus: SessionStatus,
 ): RecoveryAction {
   switch (classification) {
     case "live":

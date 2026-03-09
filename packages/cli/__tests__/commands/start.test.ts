@@ -24,6 +24,8 @@ const {
   mockSpawn,
   mockEnsureLifecycleWorker,
   mockStopLifecycleWorker,
+  mockRunRecovery,
+  mockGetPluginRegistry,
 } = vi.hoisted(() => ({
   mockExec: vi.fn(),
   mockExecSilent: vi.fn(),
@@ -42,6 +44,20 @@ const {
   mockSpawn: vi.fn(),
   mockEnsureLifecycleWorker: vi.fn(),
   mockStopLifecycleWorker: vi.fn(),
+  mockRunRecovery: vi.fn().mockResolvedValue({
+    report: {
+      totalScanned: 0,
+      recovered: [],
+      cleanedUp: [],
+      escalated: [],
+      skipped: [],
+      errors: [],
+    },
+    assessments: [],
+    results: [],
+    recoveredSessions: [],
+  }),
+  mockGetPluginRegistry: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock("../../src/lib/shell.js", () => ({
@@ -82,11 +98,13 @@ vi.mock("@composio/ao-core", async (importOriginal) => {
       if (path) return actual.loadConfig(path);
       return mockConfigRef.current;
     },
+    runRecovery: mockRunRecovery,
   };
 });
 
 vi.mock("../../src/lib/create-session-manager.js", () => ({
   getSessionManager: async (): Promise<SessionManager> => mockSessionManager as SessionManager,
+  getPluginRegistry: mockGetPluginRegistry,
 }));
 
 vi.mock("../../src/lib/lifecycle-service.js", () => ({
@@ -175,6 +193,22 @@ beforeEach(() => {
   mockStopLifecycleWorker.mockReset();
   mockStopLifecycleWorker.mockResolvedValue(true);
   mockSpawn.mockClear();
+  mockRunRecovery.mockReset();
+  mockRunRecovery.mockResolvedValue({
+    report: {
+      totalScanned: 0,
+      recovered: [],
+      cleanedUp: [],
+      escalated: [],
+      skipped: [],
+      errors: [],
+    },
+    assessments: [],
+    results: [],
+    recoveredSessions: [],
+  });
+  mockGetPluginRegistry.mockReset();
+  mockGetPluginRegistry.mockResolvedValue({});
 });
 
 afterEach(() => {
