@@ -143,7 +143,7 @@ export function Dashboard({
         <div className="mb-8 flex items-center justify-between border-b border-[var(--color-border-subtle)] pb-6">
           <div className="flex items-center gap-6">
             <h1 className="text-[17px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
-              Orchestrator
+              {projectName ?? "Orchestrator"}
             </h1>
             <StatusLine stats={liveStats} />
           </div>
