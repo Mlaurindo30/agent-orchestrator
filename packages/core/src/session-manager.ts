@@ -28,7 +28,6 @@ import {
   type SessionId,
   type SessionSpawnConfig,
   type OrchestratorSpawnConfig,
-  type SessionStatus,
   type CleanupResult,
   type ClaimPROptions,
   type ClaimPRResult,
