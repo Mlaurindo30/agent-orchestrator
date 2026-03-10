@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, type FormEvent } from "react";
 import {
   type DashboardSession,
   type DashboardStats,
@@ -40,7 +40,7 @@ const KANBAN_LEVELS = ["working", "pending", "review", "respond", "merge"] as co
 
 export function Dashboard({
   initialSessions,
-  stats,
+  stats: _initialStats,
   orchestratorId,
   projectName,
   initialGlobalPause,
@@ -193,6 +193,19 @@ export function Dashboard({
     [sessions],
   );
 
+  const liveStats = useMemo<DashboardStats>(
+    () => ({
+      totalSessions: sessions.length,
+      workingSessions: sessions.filter((s) => s.activity !== null && s.activity !== "exited")
+        .length,
+      openPRs: sessions.filter((s) => s.pr?.state === "open").length,
+      needsReview: sessions.filter(
+        (s) => s.pr && !s.pr.isDraft && s.pr.reviewDecision === "pending",
+      ).length,
+    }),
+    [sessions],
+  );
+
   // Counts for tab badges
   const backlogCount = backlogIssues.length;
   const verifyCount = verifyIssues.length;
@@ -209,7 +222,7 @@ export function Dashboard({
           <h1 className="text-[17px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
             {projectName ?? "Orchestrator"}
           </h1>
-          <StatusLine stats={stats} needsAttention={needsAttention} />
+          <StatusLine stats={liveStats} needsAttention={needsAttention} />
         </div>
         <div className="flex items-center gap-3">
           {orchestratorId && (
@@ -621,12 +634,12 @@ function VerifyCard({
   onFail,
 }: {
   issue: BacklogIssue;
-  onVerify: () => void;
-  onFail: () => void;
+  onVerify: () => Promise<void>;
+  onFail: () => Promise<void>;
 }) {
   const [acting, setActing] = useState<"verify" | "fail" | null>(null);
 
-  const handleAction = async (action: "verify" | "fail", handler: () => void) => {
+  const handleAction = async (action: "verify" | "fail", handler: () => Promise<void>) => {
     setActing(action);
     try {
       await handler();
@@ -706,7 +719,7 @@ function CreateIssueForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!title.trim() || !selectedProject) return;
 
@@ -825,7 +838,6 @@ function StatusLine({ stats, needsAttention }: { stats: DashboardStats; needsAtt
     <div className="flex items-baseline gap-0.5">
       {parts.map((p, i) => (
         <span key={p.label} className="flex items-baseline">
-          {i > 0 && <span className="mx-3 text-[11px] text-[var(--color-border-strong)]">·</span>}
           {i > 0 && <span className="mx-3 text-[11px] text-[var(--color-border-strong)]">·</span>}
           <span
             className="text-[20px] font-bold tabular-nums tracking-tight"
