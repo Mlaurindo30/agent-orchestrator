@@ -24,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Home(props: { searchParams: Promise<{ project?: string }> }) {
   const searchParams = await props.searchParams;
   let sessions: DashboardSession[] = [];
-  let orchestratorId: string | null = null;
+  let orchestratorId: string | null;
   let globalPause: GlobalPauseState | null;
   // Allow ?project=all to show all sessions (for multi-project setups)
   const projectFilter = searchParams.project ?? getPrimaryProjectId();
