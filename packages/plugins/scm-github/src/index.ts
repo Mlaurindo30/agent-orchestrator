@@ -360,9 +360,15 @@ function parseGitHubWebhookEvent(
             : undefined,
       branch: typeof head?.["ref"] === "string" ? head["ref"] : undefined,
       sha: typeof head?.["sha"] === "string" ? head["sha"] : undefined,
-      timestamp: parseTimestamp(
-        (payload["review"] as Record<string, unknown> | undefined)?.["submitted_at"],
-      ),
+      timestamp:
+        rawEventType === "pull_request_review"
+          ? parseTimestamp(
+              (payload["review"] as Record<string, unknown> | undefined)?.["submitted_at"],
+            )
+          : parseTimestamp(
+              (payload["comment"] as Record<string, unknown> | undefined)?.["updated_at"] ??
+                (payload["comment"] as Record<string, unknown> | undefined)?.["created_at"],
+            ),
       data: payload,
     };
   }

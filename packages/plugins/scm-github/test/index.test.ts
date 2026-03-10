@@ -209,6 +209,34 @@ describe("scm-github plugin", () => {
       );
     });
 
+    it("parses pull_request_review_comment timestamp from comment payload", async () => {
+      const event = await scm.parseWebhook?.(
+        makeWebhookRequest({
+          headers: { "x-github-event": "pull_request_review_comment" },
+          body: JSON.stringify({
+            action: "created",
+            repository: { owner: { login: "acme" }, name: "repo" },
+            number: 42,
+            pull_request: {
+              number: 42,
+              head: { ref: "feat/my-feature", sha: "abc123" },
+            },
+            comment: { created_at: "2026-03-10T12:00:00Z" },
+          }),
+        }),
+        project,
+      );
+
+      expect(event).toEqual(
+        expect.objectContaining({
+          provider: "github",
+          kind: "comment",
+          prNumber: 42,
+        }),
+      );
+      expect(event?.timestamp?.toISOString()).toBe("2026-03-10T12:00:00.000Z");
+    });
+
     it("parses status events with branch info", async () => {
       const event = await scm.parseWebhook?.(
         makeWebhookRequest({
