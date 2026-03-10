@@ -2,6 +2,7 @@ import type { OrchestratorConfig, PluginRegistry, Runtime, Workspace, Session } 
 import { updateMetadata, deleteMetadata } from "../metadata.js";
 import { getSessionsDir } from "../paths.js";
 import { parsePrFromUrl } from "../utils/pr.js";
+import { validateStatus } from "../utils/validation.js";
 import type { RecoveryAssessment, RecoveryResult, RecoveryContext } from "./types.js";
 
 export async function recoverSession(
@@ -25,12 +26,29 @@ export async function recoverSession(
     const recoveryCount = rawMetadata["recoveryCount"]
       ? parseInt(rawMetadata["recoveryCount"], 10) + 1
       : 1;
+    const preservedStatus = validateStatus(rawMetadata["status"]);
 
     const project = config.projects[projectId];
     const sessionsDir = getSessionsDir(config.configPath, project.path);
 
+    if (recoveryCount > context.recoveryConfig.maxRecoveryAttempts) {
+      updateMetadata(sessionsDir, sessionId, {
+        status: "stuck",
+        escalatedAt: now,
+        escalationReason: `Exceeded max recovery attempts (${context.recoveryConfig.maxRecoveryAttempts})`,
+        recoveryCount: String(recoveryCount),
+      });
+
+      return {
+        success: true,
+        sessionId,
+        action: "escalate",
+        requiresManualIntervention: true,
+      };
+    }
+
     updateMetadata(sessionsDir, sessionId, {
-      status: "working",
+      status: preservedStatus,
       recoveredAt: now,
       recoveryCount: String(recoveryCount),
     });
@@ -38,7 +56,7 @@ export async function recoverSession(
     const session: Session = {
       id: sessionId,
       projectId,
-      status: "working",
+      status: preservedStatus,
       activity: null,
       branch: rawMetadata["branch"] || null,
       issueId: rawMetadata["issue"] || null,

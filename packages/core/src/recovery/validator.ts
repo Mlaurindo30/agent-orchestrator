@@ -12,12 +12,19 @@ import {
 } from "../types.js";
 import { safeJsonParse, validateStatus } from "../utils/validation.js";
 import type { ScannedSession } from "./scanner.js";
-import type { RecoveryAssessment, RecoveryClassification, RecoveryAction } from "./types.js";
+import {
+  DEFAULT_RECOVERY_CONFIG,
+  type RecoveryAssessment,
+  type RecoveryClassification,
+  type RecoveryAction,
+  type RecoveryConfig,
+} from "./types.js";
 
 export async function validateSession(
   scanned: ScannedSession,
   config: OrchestratorConfig,
   registry: PluginRegistry,
+  recoveryConfigInput?: Partial<RecoveryConfig>,
 ): Promise<RecoveryAssessment> {
   const { sessionId, projectId, project, rawMetadata } = scanned;
 
@@ -33,6 +40,10 @@ export async function validateSession(
   const runtimeHandleStr = rawMetadata["runtimeHandle"];
   const runtimeHandle = runtimeHandleStr ? safeJsonParse<RuntimeHandle>(runtimeHandleStr) : null;
   const metadataStatus = validateStatus(rawMetadata["status"]);
+  const recoveryConfig: RecoveryConfig = {
+    ...DEFAULT_RECOVERY_CONFIG,
+    ...(recoveryConfigInput ?? {}),
+  };
 
   let runtimeAlive = false;
   if (runtime && runtimeHandle) {
@@ -76,7 +87,7 @@ export async function validateSession(
     agentProcessRunning,
     metadataStatus,
   );
-  const action = determineAction(classification, metadataStatus);
+  const action = determineAction(classification, metadataStatus, recoveryConfig);
 
   return {
     sessionId,
@@ -131,14 +142,15 @@ function classifySession(
 function determineAction(
   classification: RecoveryClassification,
   _metadataStatus: SessionStatus,
+  recoveryConfig: RecoveryConfig,
 ): RecoveryAction {
   switch (classification) {
     case "live":
       return "recover";
     case "dead":
-      return "cleanup";
+      return recoveryConfig.autoCleanup ? "cleanup" : "escalate";
     case "partial":
-      return "escalate";
+      return recoveryConfig.escalatePartial ? "escalate" : "cleanup";
     case "unrecoverable":
       return "skip";
     default:

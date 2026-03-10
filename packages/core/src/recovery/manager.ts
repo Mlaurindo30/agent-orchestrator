@@ -52,7 +52,7 @@ export async function runRecovery(options: RecoveryManagerOptions): Promise<Reco
   report.totalScanned = scannedSessions.length;
 
   for (const scanned of scannedSessions) {
-    const assessment = await validateSession(scanned, config, registry);
+    const assessment = await validateSession(scanned, config, registry, recoveryConfig);
     assessments.push(assessment);
 
     if (dryRun) {
@@ -165,7 +165,7 @@ export async function recoverSessionById(
     return null;
   }
 
-  const assessment = await validateSession(scanned, config, registry);
+  const assessment = await validateSession(scanned, config, registry, recoveryConfig);
 
   if (dryRun) {
     return {
