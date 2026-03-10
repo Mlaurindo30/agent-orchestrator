@@ -23,7 +23,8 @@ import {
   type DashboardSession,
   type DashboardPR,
   type DashboardStats,
-} from "./types.js";
+  isPRRateLimited,
+} from "./types";
 import {
   TTLCache,
   prCache,
@@ -151,7 +152,7 @@ export async function enrichSessionPR(
     maybeWriteSessionStatusTransition(
       dashboard,
       opts?.metadata,
-      dashboard.pr.mergeability.blockers.includes("API rate limited or unavailable"),
+      isPRRateLimited(dashboard.pr),
     );
     return true;
   }
