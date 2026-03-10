@@ -693,6 +693,48 @@ describe("API Routes", () => {
       }
     });
 
+    it("does not apply early 413 when any matching candidate is unbounded", async () => {
+      const originalMyAppWebhook = mockConfig.projects["my-app"]?.scm?.webhook;
+      const originalOtherProject = mockConfig.projects["other-app"];
+
+      if (mockConfig.projects["my-app"]?.scm) {
+        mockConfig.projects["my-app"].scm.webhook = {
+          path: "/api/webhooks/github",
+          maxBodyBytes: 1,
+        };
+      }
+      mockConfig.projects["other-app"] = {
+        name: "Other App",
+        repo: "acme/other-app",
+        path: "/tmp/other-app",
+        defaultBranch: "main",
+        sessionPrefix: "other-app",
+        scm: { plugin: "github", webhook: { path: "/api/webhooks/github" } },
+      };
+
+      const req = makeRequest("/api/webhooks/github", {
+        method: "POST",
+        body: JSON.stringify({ any: "payload" }),
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": "50",
+          "x-github-event": "pull_request",
+        },
+      });
+
+      const res = await webhookPOST(req);
+      expect(res.status).toBe(202);
+
+      if (mockConfig.projects["my-app"]?.scm) {
+        mockConfig.projects["my-app"].scm.webhook = originalMyAppWebhook;
+      }
+      if (originalOtherProject) {
+        mockConfig.projects["other-app"] = originalOtherProject;
+      } else {
+        delete mockConfig.projects["other-app"];
+      }
+    });
+
     it("continues after parse errors and still returns 202", async () => {
       (mockSCM.parseWebhook as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
         new Error("Invalid webhook payload"),

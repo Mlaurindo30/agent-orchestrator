@@ -24,11 +24,13 @@ export async function POST(request: Request): Promise<Response> {
 
     const rawContentLength = request.headers.get("content-length");
     const contentLength = rawContentLength ? Number(rawContentLength) : NaN;
-    const configuredMaxBodyBytes = candidates
-      .map((candidate) => candidate.project.scm?.webhook?.maxBodyBytes)
-      .filter((value): value is number => typeof value === "number");
-    const maxBodyBytes =
-      configuredMaxBodyBytes.length > 0 ? Math.min(...configuredMaxBodyBytes) : undefined;
+    const candidateMaxBodyBytes = candidates.map(
+      (candidate) => candidate.project.scm?.webhook?.maxBodyBytes,
+    );
+    const allCandidatesBounded = candidateMaxBodyBytes.every((value) => typeof value === "number");
+    const maxBodyBytes = allCandidatesBounded
+      ? Math.max(...(candidateMaxBodyBytes as number[]))
+      : undefined;
     if (
       maxBodyBytes !== undefined &&
       Number.isFinite(contentLength) &&
