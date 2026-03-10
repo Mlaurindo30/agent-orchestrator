@@ -175,9 +175,11 @@ export async function sendKeys(
 
     // For large paste-buffer payloads, allow enough time for terminal input handling.
     const adaptivePasteDelayMs = BASE_PASTE_DELAY_MS + (text.length / 1000) * PASTE_DELAY_PER_1K_CHARS_MS;
-    const baselinePane = await capturePane(sessionName, CAPTURE_PANE_LINES).catch(() => "");
-
     await new Promise((resolve) => setTimeout(resolve, adaptivePasteDelayMs));
+
+    // Capture baseline immediately before Enter so retries compare against
+    // true pre-submit state (not intermediate paste rendering changes).
+    const baselinePane = await capturePane(sessionName, CAPTURE_PANE_LINES).catch(() => "");
     await tmux("send-keys", "-t", sessionName, "Enter");
 
     let previousPane = baselinePane;
