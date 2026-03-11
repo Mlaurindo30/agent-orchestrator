@@ -76,9 +76,10 @@ export async function GET(request: Request) {
         if (remainingMs <= 0) break;
 
         const project = resolveProject(core, config.projects);
+        if (!project) continue;
+
         const scm = getSCM(registry, project);
         if (!scm) continue;
-        if (!project) continue;
 
         const sessionsDir = resolveSessionsDir(config.configPath, project.path);
 
