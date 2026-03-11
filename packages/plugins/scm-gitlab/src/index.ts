@@ -135,9 +135,8 @@ function getGitLabWebhookConfig(project: ProjectConfig) {
 }
 
 function verifyGitLabToken(secret: string, providedToken: string): boolean {
-  const expectedDigest = createHash("sha256").update(secret).digest();
-  const providedDigest = createHash("sha256").update(providedToken).digest();
-  return timingSafeEqual(expectedDigest, providedDigest);
+  const toDigest = (value: string): Buffer => createHash("sha256").update(value).digest();
+  return timingSafeEqual(toDigest(secret), toDigest(providedToken));
 }
 
 function parseGitLabRepository(payload: Record<string, unknown>) {
@@ -186,7 +185,8 @@ function parseGitLabPushBranch(
 ): string | undefined {
   const isTag = isGitLabTagRef(payload, objectAttributes);
   if (isTag) return undefined;
-  return parseWebhookBranchRef(payload["ref"]);
+  const refValue = payload["ref"];
+  return parseWebhookBranchRef(refValue);
 }
 
 function parseGitLabWebhookEvent(
