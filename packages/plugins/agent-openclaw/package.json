@@ -1,0 +1,17 @@
+{
+  "name": "@composio/agent-openclaw",
+  "version": "1.0.0",
+  "description": "Agent plugin: OpenClaw sessions as AI coding agent",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "@composio/ao-core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
