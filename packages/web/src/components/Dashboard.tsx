@@ -18,6 +18,7 @@ import { DynamicFavicon } from "./DynamicFavicon";
 import { useSessionEvents } from "@/hooks/useSessionEvents";
 import { ProjectSidebar } from "./ProjectSidebar";
 import type { ProjectInfo } from "@/lib/project-name";
+import { apiPath } from "@/lib/api-path";
 
 interface DashboardProps {
   initialSessions: DashboardSession[];
@@ -103,7 +104,7 @@ export function Dashboard({
   }, [allProjectsView, orchestrators, projects, sessions]);
 
   const handleSend = async (sessionId: string, message: string) => {
-    const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/send`, {
+    const res = await fetch(apiPath(`/api/sessions/${encodeURIComponent(sessionId)}/send`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message }),
@@ -115,7 +116,7 @@ export function Dashboard({
 
   const handleKill = async (sessionId: string) => {
     if (!confirm(`Kill session ${sessionId}?`)) return;
-    const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/kill`, {
+    const res = await fetch(apiPath(`/api/sessions/${encodeURIComponent(sessionId)}/kill`), {
       method: "POST",
     });
     if (!res.ok) {
@@ -124,7 +125,7 @@ export function Dashboard({
   };
 
   const handleMerge = async (prNumber: number) => {
-    const res = await fetch(`/api/prs/${prNumber}/merge`, { method: "POST" });
+    const res = await fetch(apiPath(`/api/prs/${prNumber}/merge`), { method: "POST" });
     if (!res.ok) {
       console.error(`Failed to merge PR #${prNumber}:`, await res.text());
     }
@@ -132,7 +133,7 @@ export function Dashboard({
 
   const handleRestore = async (sessionId: string) => {
     if (!confirm(`Restore session ${sessionId}?`)) return;
-    const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/restore`, {
+    const res = await fetch(apiPath(`/api/sessions/${encodeURIComponent(sessionId)}/restore`), {
       method: "POST",
     });
     if (!res.ok) {

@@ -2,6 +2,7 @@
 
 import { useEffect, useReducer, useRef } from "react";
 import type { DashboardSession, GlobalPauseState, SSESnapshotEvent } from "@/lib/types";
+import { apiPath } from "@/lib/api-path";
 
 interface State {
   sessions: DashboardSession[];
@@ -63,7 +64,9 @@ export function useSessionEvents(
   }, [initialSessions, initialGlobalPause]);
 
   useEffect(() => {
-    const url = project ? `/api/events?project=${encodeURIComponent(project)}` : "/api/events";
+    const url = project
+      ? apiPath(`/api/events?project=${encodeURIComponent(project)}`)
+      : apiPath("/api/events");
     const es = new EventSource(url);
 
     es.onmessage = (event: MessageEvent) => {
@@ -83,8 +86,8 @@ export function useSessionEvents(
           if (!sameMembership && !refreshingRef.current) {
             refreshingRef.current = true;
             const sessionsUrl = project
-              ? `/api/sessions?project=${encodeURIComponent(project)}`
-              : "/api/sessions";
+              ? apiPath(`/api/sessions?project=${encodeURIComponent(project)}`)
+              : apiPath("/api/sessions");
             void fetch(sessionsUrl)
               .then((res) => (res.ok ? res.json() : null))
               .then(
