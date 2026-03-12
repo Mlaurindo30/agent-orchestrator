@@ -104,6 +104,19 @@ const AgentSpecificConfigSchema = z
   })
   .passthrough();
 
+const RoleAgentDefaultsSchema = z
+  .object({
+    agent: z.string().optional(),
+  })
+  .optional();
+
+const RoleAgentConfigSchema = z
+  .object({
+    agent: z.string().optional(),
+    agentConfig: AgentSpecificConfigSchema.default({}),
+  })
+  .optional();
+
 const DecomposerConfigSchema = z
   .object({
     enabled: z.boolean().default(false),
@@ -135,6 +148,8 @@ const ProjectConfigSchema = z.object({
   symlinks: z.array(z.string()).optional(),
   postCreate: z.array(z.string()).optional(),
   agentConfig: AgentSpecificConfigSchema.default({}),
+  orchestrator: RoleAgentConfigSchema,
+  worker: RoleAgentConfigSchema,
   reactions: z.record(ReactionConfigSchema.partial()).optional(),
   agentRules: z.string().optional(),
   agentRulesFile: z.string().optional(),
@@ -151,6 +166,8 @@ const DefaultPluginsSchema = z.object({
   agent: z.string().default("claude-code"),
   workspace: z.string().default("worktree"),
   notifiers: z.array(z.string()).default(["composio", "desktop"]),
+  orchestrator: RoleAgentDefaultsSchema,
+  worker: RoleAgentDefaultsSchema,
 });
 
 const OrchestratorConfigSchema = z.object({

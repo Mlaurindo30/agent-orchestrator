@@ -73,6 +73,7 @@ import {
 } from "./global-pause.js";
 import { sessionFromMetadata } from "./utils/session-from-metadata.js";
 import { safeJsonParse } from "./utils/validation.js";
+import { resolveAgentSelection, resolveSessionRole } from "./agent-selection.js";
 
 const execFileAsync = promisify(execFile);
 const OPENCODE_DISCOVERY_TIMEOUT_MS = 2_000;
@@ -674,12 +675,9 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
   }
 
   /** Resolve which plugins to use for a project. */
-  function resolvePlugins(project: ProjectConfig, agentOverride?: string) {
+  function resolvePlugins(project: ProjectConfig, agentName?: string) {
     const runtime = registry.get<Runtime>("runtime", project.runtime ?? config.defaults.runtime);
-    const agent = registry.get<Agent>(
-      "agent",
-      agentOverride ?? project.agent ?? config.defaults.agent,
-    );
+    const agent = registry.get<Agent>("agent", agentName ?? project.agent ?? config.defaults.agent);
     const workspace = registry.get<Workspace>(
       "workspace",
       project.workspace ?? config.defaults.workspace,
@@ -690,6 +688,19 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
     const scm = project.scm ? registry.get<SCM>("scm", project.scm.plugin) : null;
 
     return { runtime, agent, workspace, tracker, scm };
+  }
+
+  function resolveSelectionForSession(
+    project: ProjectConfig,
+    sessionId: string,
+    metadata: Record<string, string>,
+  ) {
+    return resolveAgentSelection({
+      role: resolveSessionRole(sessionId, metadata),
+      project,
+      defaults: config.defaults,
+      persistedAgent: metadata["agent"],
+    });
   }
 
   async function ensureOpenCodeSessionMapping(
@@ -855,22 +866,19 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
       );
     }
 
-    const plugins = resolvePlugins(project);
+    const selection = resolveAgentSelection({
+      role: "worker",
+      project,
+      defaults: config.defaults,
+      spawnAgentOverride: spawnConfig.agent,
+    });
+    const plugins = resolvePlugins(project, selection.agentName);
     if (!plugins.runtime) {
       throw new Error(`Runtime plugin '${project.runtime ?? config.defaults.runtime}' not found`);
     }
 
-    // Allow --agent override to swap the agent plugin for this session
-    if (spawnConfig.agent) {
-      const overrideAgent = registry.get<Agent>("agent", spawnConfig.agent);
-      if (!overrideAgent) {
-        throw new Error(`Agent plugin '${spawnConfig.agent}' not found`);
-      }
-      plugins.agent = overrideAgent;
-    }
-
     if (!plugins.agent) {
-      throw new Error(`Agent plugin '${project.agent ?? config.defaults.agent}' not found`);
+      throw new Error(`Agent plugin '${selection.agentName}' not found`);
     }
 
     // Validate issue exists BEFORE creating any resources
@@ -994,25 +1002,20 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
             strategy: opencodeIssueSessionStrategy,
           })
         : undefined;
-    const configuredSubagent =
-      typeof project.agentConfig?.["subagent"] === "string"
-        ? project.agentConfig["subagent"]
-        : undefined;
-
     const agentLaunchConfig = {
       sessionId,
       projectConfig: {
         ...project,
         agentConfig: {
-          ...(project.agentConfig ?? {}),
+          ...selection.agentConfig,
           ...(reusedOpenCodeSessionId ? { opencodeSessionId: reusedOpenCodeSessionId } : {}),
         },
       },
       issueId: spawnConfig.issueId,
       prompt: composedPrompt,
-      permissions: project.agentConfig?.permissions,
-      model: project.agentConfig?.model,
-      subagent: spawnConfig.subagent ?? configuredSubagent,
+      permissions: selection.permissions,
+      model: selection.model,
+      subagent: spawnConfig.subagent ?? selection.subagent,
     };
 
     let handle: RuntimeHandle;
@@ -1079,7 +1082,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
         tmuxName, // Store tmux name for mapping
         issue: spawnConfig.issueId,
         project: spawnConfig.projectId,
-        agent: plugins.agent.name, // Persist agent name for lifecycle manager
+        agent: selection.agentName, // Persist agent name for lifecycle manager
         createdAt: new Date().toISOString(),
         runtimeHandle: JSON.stringify(handle),
         opencodeSessionId: reusedOpenCodeSessionId,
@@ -1162,12 +1165,17 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
       );
     }
 
-    const plugins = resolvePlugins(project);
+    const selection = resolveAgentSelection({
+      role: "orchestrator",
+      project,
+      defaults: config.defaults,
+    });
+    const plugins = resolvePlugins(project, selection.agentName);
     if (!plugins.runtime) {
       throw new Error(`Runtime plugin '${project.runtime ?? config.defaults.runtime}' not found`);
     }
     if (!plugins.agent) {
-      throw new Error(`Agent plugin '${project.agent ?? config.defaults.agent}' not found`);
+      throw new Error(`Agent plugin '${selection.agentName}' not found`);
     }
 
     const sessionId = `${project.sessionPrefix}-orchestrator`;
@@ -1280,11 +1288,6 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
             strategy: "reuse",
           })
         : undefined;
-    const configuredSubagent =
-      typeof project.agentConfig?.["subagent"] === "string"
-        ? project.agentConfig["subagent"]
-        : undefined;
-
     if (plugins.agent.name === "opencode" && orchestratorSessionStrategy === "delete") {
       await resolveOpenCodeSessionReuse({
         sessionsDir,
@@ -1301,14 +1304,14 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
       projectConfig: {
         ...project,
         agentConfig: {
-          ...(project.agentConfig ?? {}),
+          ...selection.agentConfig,
           ...(reusableOpenCodeSessionId ? { opencodeSessionId: reusableOpenCodeSessionId } : {}),
         },
       },
       permissions: "permissionless" as const,
-      model: project.agentConfig?.orchestratorModel ?? project.agentConfig?.model,
+      model: selection.model,
       systemPromptFile,
-      subagent: configuredSubagent,
+      subagent: selection.subagent,
     };
 
     const launchCommand = plugins.agent.getLaunchCommand(agentLaunchConfig);
@@ -1354,7 +1357,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
         role: "orchestrator",
         tmuxName,
         project: orchestratorConfig.projectId,
-        agent: plugins.agent.name,
+        agent: selection.agentName,
         createdAt: new Date().toISOString(),
         runtimeHandle: JSON.stringify(handle),
         opencodeSessionId: reusableOpenCodeSessionId,
@@ -1428,8 +1431,8 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
       }
 
       const session = metadataToSession(sessionName, raw, sessionProjectId, createdAt, modifiedAt);
-      const selectedAgentName = raw["agent"];
-      const effectiveAgentName = selectedAgentName ?? project.agent ?? config.defaults.agent;
+      const selection = resolveSelectionForSession(project, sessionName, raw);
+      const effectiveAgentName = selection.agentName;
       const plugins = resolvePlugins(project, effectiveAgentName);
       const sessionListPromise =
         effectiveAgentName === "opencode"
@@ -1491,8 +1494,8 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
 
       const session = metadataToSession(sessionId, repaired.raw, projectId, createdAt, modifiedAt);
 
-      const selectedAgentName = repaired.raw["agent"];
-      const effectiveAgentName = selectedAgentName ?? project.agent ?? config.defaults.agent;
+      const selection = resolveSelectionForSession(project, sessionId, repaired.raw);
+      const effectiveAgentName = selection.agentName;
       const plugins = resolvePlugins(project, effectiveAgentName);
       await ensureHandleAndEnrich(
         session,
@@ -1512,7 +1515,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
   async function kill(sessionId: SessionId, options?: { purgeOpenCode?: boolean }): Promise<void> {
     const { raw, sessionsDir, project, projectId } = requireSessionRecord(sessionId);
 
-    const cleanupAgent = raw["agent"] ?? project?.agent ?? config.defaults.agent;
+    const cleanupAgent = resolveSelectionForSession(project, sessionId, raw).agentName;
 
     // Destroy runtime — prefer handle.runtimeName to find the correct plugin
     if (raw["runtimeHandle"]) {
@@ -1694,7 +1697,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
           continue;
         }
 
-        const cleanupAgent = archived["agent"] ?? project.agent ?? config.defaults.agent;
+        const cleanupAgent = resolveSelectionForSession(project, archivedId, archived).agentName;
         const mappedOpenCodeSessionId = asValidOpenCodeSessionId(archived["opencodeSessionId"]);
         if (cleanupAgent === "opencode" && archived["opencodeCleanedAt"]) {
           pushSkipped(projectKey, archivedId);
@@ -1748,7 +1751,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
       );
     }
 
-    const selectedAgent = raw["agent"] ?? project.agent ?? config.defaults.agent;
+    const selectedAgent = resolveSelectionForSession(project, sessionId, raw).agentName;
     if (selectedAgent === "opencode" && !asValidOpenCodeSessionId(raw["opencodeSessionId"])) {
       const discovered = await discoverOpenCodeSessionIdByTitle(
         sessionId,
@@ -1763,7 +1766,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
       ? safeJsonParse<RuntimeHandle>(raw["runtimeHandle"])
       : null;
     const runtimeName = parsedHandle?.runtimeName ?? project.runtime ?? config.defaults.runtime;
-    const agentName = raw["agent"] ?? project.agent ?? config.defaults.agent;
+    const agentName = selectedAgent;
 
     const runtimePlugin = registry.get<Runtime>("runtime", runtimeName);
     if (!runtimePlugin) {
@@ -1955,7 +1958,10 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
       throw new Error(`Session ${sessionId} is an orchestrator session and cannot claim PRs`);
     }
 
-    const plugins = resolvePlugins(project, raw["agent"]);
+    const plugins = resolvePlugins(
+      project,
+      resolveSelectionForSession(project, sessionId, raw).agentName,
+    );
     const scm = plugins.scm;
     if (!scm?.resolvePR || !scm.checkoutPR) {
       throw new Error(
@@ -2042,7 +2048,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
   async function remap(sessionId: SessionId, force = false): Promise<string> {
     const { raw, sessionsDir, project } = requireSessionRecord(sessionId);
 
-    const selectedAgent = raw["agent"] ?? project.agent ?? config.defaults.agent;
+    const selectedAgent = resolveSelectionForSession(project, sessionId, raw).agentName;
     if (selectedAgent !== "opencode") {
       throw new Error(`Session ${sessionId} is not using the opencode agent`);
     }
@@ -2099,7 +2105,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
       throw new SessionNotFoundError(sessionId);
     }
 
-    const selectedAgent = raw["agent"] ?? project.agent ?? config.defaults.agent;
+    const selectedAgent = resolveSelectionForSession(project, sessionId, raw).agentName;
     if (selectedAgent === "opencode" && !asValidOpenCodeSessionId(raw["opencodeSessionId"])) {
       const discovered = await discoverOpenCodeSessionIdByTitle(
         sessionId,
@@ -2119,7 +2125,8 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
     //    session (status "working", agent exited) would not be detected as terminal
     //    and isRestorable would reject it.
     const session = metadataToSession(sessionId, raw, projectId);
-    const plugins = resolvePlugins(project, raw["agent"]);
+    const selection = resolveSelectionForSession(project, sessionId, raw);
+    const plugins = resolvePlugins(project, selection.agentName);
     await enrichSessionWithRuntimeState(session, plugins, true);
 
     // 3. Validate restorability
@@ -2155,7 +2162,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
       throw new Error(`Runtime plugin '${project.runtime ?? config.defaults.runtime}' not found`);
     }
     if (!plugins.agent) {
-      throw new Error(`Agent plugin '${project.agent ?? config.defaults.agent}' not found`);
+      throw new Error(`Agent plugin '${selection.agentName}' not found`);
     }
 
     // 5. Check workspace
@@ -2206,28 +2213,21 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
 
     // 7. Get launch command — try restore command first, fall back to fresh launch
     let launchCommand: string;
-    const configuredSubagent =
-      typeof project.agentConfig?.["subagent"] === "string"
-        ? project.agentConfig["subagent"]
-        : undefined;
     const agentLaunchConfig = {
       sessionId,
       projectConfig: {
         ...project,
         agentConfig: {
-          ...(project.agentConfig ?? {}),
+          ...selection.agentConfig,
           ...(session.metadata?.opencodeSessionId
             ? { opencodeSessionId: session.metadata.opencodeSessionId }
             : {}),
         },
       },
       issueId: session.issueId ?? undefined,
-      permissions: project.agentConfig?.permissions,
-      model:
-        raw["role"] === "orchestrator"
-          ? (project.agentConfig?.orchestratorModel ?? project.agentConfig?.model)
-          : project.agentConfig?.model,
-      subagent: configuredSubagent,
+      permissions: selection.role === "orchestrator" ? "permissionless" : selection.permissions,
+      model: selection.model,
+      subagent: selection.subagent,
     };
 
     if (plugins.agent.getRestoreCommand) {
