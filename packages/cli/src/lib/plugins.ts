@@ -4,6 +4,7 @@ import codexPlugin from "@composio/ao-plugin-agent-codex";
 import aiderPlugin from "@composio/ao-plugin-agent-aider";
 import opencodePlugin from "@composio/ao-plugin-agent-opencode";
 import openclawPlugin from "../../../plugins/agent-openclaw/dist/index.js";
+import geminiPlugin from "../../../plugins/agent-gemini/dist/index.js";
 import githubSCMPlugin from "@composio/ao-plugin-scm-github";
 
 const agentPlugins: Record<string, { create(): Agent }> = {
@@ -12,6 +13,7 @@ const agentPlugins: Record<string, { create(): Agent }> = {
   aider: aiderPlugin,
   opencode: opencodePlugin,
   openclaw: openclawPlugin,
+  gemini: geminiPlugin,
 };
 
 const scmPlugins: Record<string, { create(): SCM }> = {
