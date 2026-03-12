@@ -3,9 +3,9 @@
 Audit scope:
 
 - Docs:
-  - `/home/lifeos/lifeos/static/drafts/ao-decentralized-self-improvement-design-v1.html`
-  - `/home/lifeos/lifeos/static/drafts/ao-self-improving-decentralized-ai-2026-03-10.html`
-  - `/home/lifeos/lifeos/static/linkedin-article/decentralized-self-improving-ai-system.html`
+  - `static/drafts/ao-decentralized-self-improvement-design-v1.html`
+  - `static/drafts/ao-self-improving-decentralized-ai-2026-03-10.html`
+  - `static/linkedin-article/decentralized-self-improving-ai-system.html`
 - PRs: `#402 #403 #396 #395 #374 #408`
 - Inputs reviewed per PR: code changes, CI/check status, review comments (including Cursor Bugbot), issue comments.
 
