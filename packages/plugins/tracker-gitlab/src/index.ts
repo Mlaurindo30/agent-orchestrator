@@ -14,7 +14,7 @@ import type {
   ProjectConfig,
 } from "@composio/ao-core";
 
-import { glab, parseJSON, extractHost, stripHost } from "@composio/ao-plugin-scm-gitlab/glab-utils";
+import { glab, parseJSON, extractHost, stripHost } from "./glab-utils.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
