@@ -770,6 +770,60 @@ describe("spawn", () => {
       expect(meta!["agent"]).toBe("mock-agent");
     });
 
+    it("uses project worker agent when configured and no spawn override is provided", async () => {
+      const configWithWorkerAgent: OrchestratorConfig = {
+        ...config,
+        projects: {
+          ...config.projects,
+          "my-app": {
+            ...config.projects["my-app"],
+            agent: "mock-agent",
+            worker: {
+              agent: "codex",
+            },
+          },
+        },
+      };
+
+      const sm = createSessionManager({
+        config: configWithWorkerAgent,
+        registry: registryWithMultipleAgents,
+      });
+      await sm.spawn({ projectId: "my-app" });
+
+      expect(mockCodexAgent.getLaunchCommand).toHaveBeenCalled();
+      expect(mockAgent.getLaunchCommand).not.toHaveBeenCalled();
+      expect(readMetadataRaw(sessionsDir, "app-1")?.["agent"]).toBe("codex");
+    });
+
+    it("uses defaults worker agent when project agent is not set", async () => {
+      const configWithDefaultWorkerAgent: OrchestratorConfig = {
+        ...config,
+        defaults: {
+          ...config.defaults,
+          worker: {
+            agent: "codex",
+          },
+        },
+        projects: {
+          ...config.projects,
+          "my-app": {
+            ...config.projects["my-app"],
+            agent: undefined,
+          },
+        },
+      };
+
+      const sm = createSessionManager({
+        config: configWithDefaultWorkerAgent,
+        registry: registryWithMultipleAgents,
+      });
+      await sm.spawn({ projectId: "my-app" });
+
+      expect(mockCodexAgent.getLaunchCommand).toHaveBeenCalled();
+      expect(readMetadataRaw(sessionsDir, "app-1")?.["agent"]).toBe("codex");
+    });
+
     it("readMetadata returns agent field (typed SessionMetadata)", async () => {
       const sm = createSessionManager({ config, registry: registryWithMultipleAgents });
 
@@ -3159,6 +3213,98 @@ describe("spawnOrchestrator", () => {
     expect(mockAgent.getLaunchCommand).toHaveBeenCalledWith(
       expect.objectContaining({ model: "orchestrator-model" }),
     );
+  });
+
+  it("uses project orchestrator agent when configured", async () => {
+    const mockCodexAgent: Agent = {
+      ...mockAgent,
+      name: "codex",
+      processName: "codex",
+      getLaunchCommand: vi.fn().mockReturnValue("codex --start"),
+      getEnvironment: vi.fn().mockReturnValue({ CODEX_VAR: "1" }),
+    };
+    const registryWithMultipleAgents: PluginRegistry = {
+      ...mockRegistry,
+      get: vi.fn().mockImplementation((slot: string, name: string) => {
+        if (slot === "runtime") return mockRuntime;
+        if (slot === "workspace") return mockWorkspace;
+        if (slot === "agent") {
+          if (name === "codex") return mockCodexAgent;
+          if (name === "mock-agent") return mockAgent;
+        }
+        return null;
+      }),
+    };
+    const configWithOrchestratorAgent: OrchestratorConfig = {
+      ...config,
+      projects: {
+        ...config.projects,
+        "my-app": {
+          ...config.projects["my-app"],
+          agent: "mock-agent",
+          orchestrator: {
+            agent: "codex",
+          },
+        },
+      },
+    };
+
+    const sm = createSessionManager({
+      config: configWithOrchestratorAgent,
+      registry: registryWithMultipleAgents,
+    });
+    await sm.spawnOrchestrator({ projectId: "my-app" });
+
+    expect(mockCodexAgent.getLaunchCommand).toHaveBeenCalled();
+    expect(mockAgent.getLaunchCommand).not.toHaveBeenCalled();
+    expect(readMetadataRaw(sessionsDir, "app-orchestrator")?.["agent"]).toBe("codex");
+  });
+
+  it("uses defaults orchestrator agent when project agent is not set", async () => {
+    const mockCodexAgent: Agent = {
+      ...mockAgent,
+      name: "codex",
+      processName: "codex",
+      getLaunchCommand: vi.fn().mockReturnValue("codex --start"),
+      getEnvironment: vi.fn().mockReturnValue({ CODEX_VAR: "1" }),
+    };
+    const registryWithMultipleAgents: PluginRegistry = {
+      ...mockRegistry,
+      get: vi.fn().mockImplementation((slot: string, name: string) => {
+        if (slot === "runtime") return mockRuntime;
+        if (slot === "workspace") return mockWorkspace;
+        if (slot === "agent") {
+          if (name === "codex") return mockCodexAgent;
+          if (name === "mock-agent") return mockAgent;
+        }
+        return null;
+      }),
+    };
+    const configWithDefaultOrchestratorAgent: OrchestratorConfig = {
+      ...config,
+      defaults: {
+        ...config.defaults,
+        orchestrator: {
+          agent: "codex",
+        },
+      },
+      projects: {
+        ...config.projects,
+        "my-app": {
+          ...config.projects["my-app"],
+          agent: undefined,
+        },
+      },
+    };
+
+    const sm = createSessionManager({
+      config: configWithDefaultOrchestratorAgent,
+      registry: registryWithMultipleAgents,
+    });
+    await sm.spawnOrchestrator({ projectId: "my-app" });
+
+    expect(mockCodexAgent.getLaunchCommand).toHaveBeenCalled();
+    expect(readMetadataRaw(sessionsDir, "app-orchestrator")?.["agent"]).toBe("codex");
   });
 
   it("forwards configured subagent to orchestrator launch", async () => {
