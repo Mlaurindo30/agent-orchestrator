@@ -20,12 +20,8 @@ import {
   type OrchestratorConfig,
   type PluginRegistry,
 } from "@composio/ao-core";
-import {
-  type DashboardSession,
-  type DashboardPR,
-  type DashboardStats,
-  isPRRateLimited,
-} from "./types";
+import { isPRRateLimited } from "./types";
+import type { DashboardSession, DashboardPR, DashboardStats } from "./types.js";
 import {
   TTLCache,
   prCache,
@@ -299,6 +295,7 @@ function deriveSessionStatusTransition(
 
   if (pr.state === "merged") return SESSION_STATUS.MERGED;
   if (pr.state === "closed") return SESSION_STATUS.DONE;
+  if (currentStatus === SESSION_STATUS.MERGEABLE) return null;
 
   // During rate limiting, CI/review data can be stale defaults.
   if (rateLimited) return null;

@@ -458,6 +458,25 @@ describe("enrichSessionPR", () => {
     expect(updateMetadataSpy).not.toHaveBeenCalled();
     expect(dashboard.status).toBe("working");
   });
+
+  it("should not downgrade mergeable status to approved during enrichment", async () => {
+    const pr = createPRInfo();
+    const coreSession = createCoreSession({ status: "mergeable", pr });
+    const dashboard = sessionToDashboard(coreSession);
+    const scm = createMockSCM();
+    const updateMetadataSpy = vi.spyOn(core, "updateMetadata").mockImplementation(() => {});
+
+    await enrichSessionPR(dashboard, scm, pr, {
+      metadata: {
+        sessionsDir: "/tmp/sessions",
+        sessionId: "test-1",
+        currentStatus: "mergeable",
+      },
+    });
+
+    expect(updateMetadataSpy).not.toHaveBeenCalled();
+    expect(dashboard.status).toBe("mergeable");
+  });
 });
 
 describe("enrichSessionAgentSummary", () => {
